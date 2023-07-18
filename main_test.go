@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 )
@@ -18,7 +19,7 @@ func TestCompareEAD(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		match := (string(origBytes) == string(alteredBytes))
+		match := bytes.Equal(origBytes, alteredBytes)
 		if match != true {
 			t.Error(fmt.Errorf("ArchDescs are not the same"))
 		}
@@ -32,7 +33,7 @@ func TestCompareEAD(t *testing.T) {
 			t.Error(err)
 		}
 
-		match := (string(origBytes) == string(alteredBytes))
+		match := bytes.Equal(origBytes, alteredBytes)
 		if match != false {
 			t.Error(fmt.Errorf("ArchDescs are the same"))
 		}
