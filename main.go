@@ -35,14 +35,17 @@ func main() {
 				continue
 			}
 
-			originalBytes, err := GetArchDescBytes(dir1Path)
+			fmt.Printf("comparing %s with %s", dir1Path, dir2path)
+			originalBytes, err := GetEadBytesWithoutModDate(dir1Path)
 			if err != nil {
-				panic(err)
+				fmt.Println(err.Error())
+				continue
 			}
 
-			newBytes, err := GetArchDescBytes(dir2path)
+			newBytes, err := GetEadBytesWithoutModDate(dir2path)
 			if err != nil {
-				panic(err)
+				fmt.Println(err.Error())
+				continue
 			}
 
 			if bytes.Equal(originalBytes, newBytes) != true {
@@ -86,6 +89,10 @@ func GetEadBytesWithoutModDate(path string) ([]byte, error) {
 	eadBytes = bytes.ReplaceAll(eadBytes, []byte("\n"), []byte(""))
 
 	matches := datePtn.FindAllSubmatchIndex(eadBytes, 1)
+	if len(matches) != 1 {
+		return []byte{}, fmt.Errorf("Could not find creation date in: %s", path)
+	}
+
 	match := matches[0]
 
 	for i := match[0] + 6; i < match[1]-5; i++ {
