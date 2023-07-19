@@ -44,13 +44,13 @@ func TestDate(t *testing.T) {
 	origPath := "test/mss_360_Orig.xml"
 
 	t.Run("Test Ignore Modified CreationDate", func(t *testing.T) {
-		origBytes, err := GetEadBytesWithoutModDate(origPath)
+		origBytes, err := GetEadBytesWithRedactedCreateDate(origPath)
 		if err != nil {
 			t.Error(err)
 		}
 
 		alteredPath := "test/mss_360_Altered_CreationDate.xml"
-		alteredBytes, err := GetEadBytesWithoutModDate(alteredPath)
+		alteredBytes, err := GetEadBytesWithRedactedCreateDate(alteredPath)
 		if err != nil {
 			t.Error(err)
 		}
