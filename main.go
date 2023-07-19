@@ -10,6 +10,7 @@ import (
 )
 
 var ad = regexp.MustCompile("<archdesc.*archdesc>")
+var datePtn = regexp.MustCompile("<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} -[0-9]{4}</date>")
 var subDirs = []string{"akkasah", "archives", "cbh", "fales", "nyhs", "nyuad", "poly", "tamwag", "vlp"}
 
 func main() {
@@ -75,4 +76,21 @@ func GetArchDescBytes(path string) ([]byte, error) {
 	}
 
 	return []byte{}, fmt.Errorf("wtf")
+}
+
+func GetEadBytesWithoutModDate(path string) ([]byte, error) {
+	eadBytes, err := os.ReadFile(path)
+	if err != nil {
+		return []byte{}, err
+	}
+	eadBytes = bytes.ReplaceAll(eadBytes, []byte("\n"), []byte(""))
+
+	matches := datePtn.FindAllSubmatchIndex(eadBytes, 1)
+	match := matches[0]
+
+	for i := match[0] + 6; i < match[1]-5; i++ {
+		eadBytes[i] = 88
+	}
+
+	return eadBytes, nil
 }
