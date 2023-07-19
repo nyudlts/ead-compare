@@ -81,7 +81,7 @@ func GetArchDescBytes(path string) ([]byte, error) {
 	return []byte{}, fmt.Errorf("wtf")
 }
 
-func GetEadBytesWithoutModDate(path string) ([]byte, error) {
+func GetEadBytesWithRedactedCreateDate(path string) ([]byte, error) {
 	eadBytes, err := os.ReadFile(path)
 	if err != nil {
 		return []byte{}, err
