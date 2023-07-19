@@ -36,13 +36,13 @@ func main() {
 			}
 
 			fmt.Printf("comparing %s with %s", dir1Path, dir2path)
-			originalBytes, err := GetEadBytesWithoutModDate(dir1Path)
+			originalBytes, err := GetEadBytesWithRedactedCreateDate(dir1Path)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
 			}
 
-			newBytes, err := GetEadBytesWithoutModDate(dir2path)
+			newBytes, err := GetEadBytesWithRedactedCreateDate(dir2path)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
