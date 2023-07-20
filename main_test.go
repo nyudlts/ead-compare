@@ -62,3 +62,22 @@ func TestDate(t *testing.T) {
 
 	})
 }
+
+func TestRedactID(t *testing.T) {
+	origPath := "test/mss_360_Orig.xml"
+	alteredPath := "test/mss_360_Altered_IDs.xml"
+	t.Run("Test Getting Redacted Bytes", func(t *testing.T) {
+		origBytesRedax, err := GetRedactedIDsBytes(origPath)
+		if err != nil {
+			t.Error(err)
+		}
+		alteredBytesRedax, err := GetRedactedIDsBytes(alteredPath)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if bytes.Equal(origBytesRedax, alteredBytesRedax) != true {
+			t.Error(err)
+		}
+	})
+}

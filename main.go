@@ -11,7 +11,8 @@ import (
 
 var ad = regexp.MustCompile("<archdesc.*archdesc>")
 var datePtn = regexp.MustCompile("<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} -[0-9]{4}</date>")
-var subDirs = []string{"akkasah", "archives", "cbh", "fales", "nyhs", "nyuad", "poly", "tamwag", "vlp"}
+var idPtn = regexp.MustCompile("id=\"aspace_.{32}\"")
+var subDirs = []string{"archives", "fales", "tamwag", "vlp"}
 
 func main() {
 	dir1 := os.Args[1]
@@ -35,7 +36,7 @@ func main() {
 				continue
 			}
 
-			fmt.Printf("comparing %s with %s", dir1Path, dir2path)
+			//fmt.Printf("comparing %s with %s", dir1Path, dir2path)
 			originalBytes, err := GetEadBytesWithRedactedCreateDate(dir1Path)
 			if err != nil {
 				fmt.Println(err.Error())
@@ -97,6 +98,27 @@ func GetEadBytesWithRedactedCreateDate(path string) ([]byte, error) {
 
 	for i := match[0] + 6; i < match[1]-5; i++ {
 		eadBytes[i] = 88
+	}
+
+	return eadBytes, nil
+}
+
+func GetRedactedIDsBytes(path string) ([]byte, error) {
+	eadBytes, err := os.ReadFile(path)
+	if err != nil {
+		return []byte{}, err
+	}
+	eadBytes = bytes.ReplaceAll(eadBytes, []byte("\n"), []byte(""))
+
+	ids := idPtn.FindAllSubmatchIndex(eadBytes, -1)
+	if len(ids) < 1 {
+		return []byte{}, fmt.Errorf("Could not find any ids: %s", path)
+	}
+
+	for _, id := range ids {
+		for i := id[0] + 11; i < id[1]-1; i++ {
+			eadBytes[i] = 88
+		}
 	}
 
 	return eadBytes, nil
