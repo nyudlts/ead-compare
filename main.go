@@ -12,6 +12,7 @@ import (
 var ad = regexp.MustCompile("<archdesc.*archdesc>")
 var datePtn = regexp.MustCompile("<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} -[0-9]{4}</date>")
 var idPtn = regexp.MustCompile("id=\"aspace_.{32}\"")
+var parentPtn = regexp.MustCompile("parent=\"aspace_.{32}\"")
 var subDirs = []string{"archives", "fales", "tamwag", "vlp"}
 
 func main() {
@@ -37,13 +38,13 @@ func main() {
 			}
 
 			//fmt.Printf("comparing %s with %s", dir1Path, dir2path)
-			originalBytes, err := GetEadBytesWithRedactedCreateDate(dir1Path)
+			originalBytes, err := RedactCreateDate(dir1Path)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
 			}
 
-			newBytes, err := GetEadBytesWithRedactedCreateDate(dir2path)
+			newBytes, err := RedactCreateDate(dir2path)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
@@ -82,7 +83,7 @@ func GetArchDescBytes(path string) ([]byte, error) {
 	return []byte{}, fmt.Errorf("wtf")
 }
 
-func GetEadBytesWithRedactedCreateDate(path string) ([]byte, error) {
+func RedactCreateDate(path string) ([]byte, error) {
 	eadBytes, err := os.ReadFile(path)
 	if err != nil {
 		return []byte{}, err
@@ -103,7 +104,7 @@ func GetEadBytesWithRedactedCreateDate(path string) ([]byte, error) {
 	return eadBytes, nil
 }
 
-func GetRedactedIDsBytes(path string) ([]byte, error) {
+func RedactedIDAttr(path string) ([]byte, error) {
 	eadBytes, err := os.ReadFile(path)
 	if err != nil {
 		return []byte{}, err
@@ -119,6 +120,31 @@ func GetRedactedIDsBytes(path string) ([]byte, error) {
 		for i := id[0] + 11; i < id[1]-1; i++ {
 			eadBytes[i] = 88
 		}
+	}
+
+	return eadBytes, nil
+}
+
+func RedactedParentAttr(path string) ([]byte, error) {
+	eadBytes, err := os.ReadFile(path)
+	if err != nil {
+		return []byte{}, err
+	}
+	eadBytes = bytes.ReplaceAll(eadBytes, []byte("\n"), []byte(""))
+
+	ids := parentPtn.FindAllSubmatchIndex(eadBytes, -1)
+	if len(ids) < 1 {
+		return []byte{}, fmt.Errorf("Could not find any parent attrs: %s", path)
+	}
+
+	for _, id := range ids {
+
+		for i := id[0] + 15; i < id[1]-1; i++ {
+			eadBytes[i] = 88
+		}
+
+		fmt.Println(string(eadBytes[id[0]:id[1]]))
+
 	}
 
 	return eadBytes, nil
