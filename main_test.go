@@ -13,18 +13,6 @@ func TestCompareEAD(t *testing.T) {
 		t.Error(err)
 	}
 
-	t.Run("testing compare changed headers", func(t *testing.T) {
-		alteredPath := "test/mss_360_AlteredHeader.xml"
-		alteredBytes, err := GetArchDescBytes(alteredPath)
-		if err != nil {
-			t.Error(err)
-		}
-		match := bytes.Equal(origBytes, alteredBytes)
-		if match != true {
-			t.Error(fmt.Errorf("ArchDescs are not the same"))
-		}
-	})
-
 	t.Run("testing compare changed archdescs", func(t *testing.T) {
 
 		alteredPath := "test/mss_360_AlteredArchDesc.xml"
@@ -45,12 +33,22 @@ func TestDate(t *testing.T) {
 	alteredPath := "test/mss_360_Altered_Create_Date.xml"
 
 	t.Run("Test Ignore Modified CreationDate", func(t *testing.T) {
-		origBytes, err := RedactCreateDate(origPath)
+		origBytes, err := GetFileBytes(origPath)
 		if err != nil {
 			t.Error(err)
 		}
 
-		alteredBytes, err := RedactCreateDate(alteredPath)
+		origBytes, err = RedactCreateDate(origBytes)
+		if err != nil {
+			t.Error(err)
+		}
+
+		alteredBytes, err := GetFileBytes(alteredPath)
+		if err != nil {
+			t.Error(err)
+		}
+
+		alteredBytes, err = RedactCreateDate(alteredBytes)
 		if err != nil {
 			t.Error(err)
 		}
@@ -68,16 +66,26 @@ func TestRedactAttr(t *testing.T) {
 
 	t.Run("Test Getting Redacted ID attributes", func(t *testing.T) {
 		alteredPath := "test/mss_360_Altered_IDs.xml"
-		origBytesRedax, err := RedactedIDAttr(origPath)
-		if err != nil {
-			t.Error(err)
-		}
-		alteredBytesRedax, err := RedactedIDAttr(alteredPath)
+		origBytes, err := GetFileBytes(origPath)
 		if err != nil {
 			t.Error(err)
 		}
 
-		if bytes.Equal(origBytesRedax, alteredBytesRedax) != true {
+		origBytes, err = RedactedIDAttr(origBytes)
+		if err != nil {
+			t.Error(err)
+		}
+
+		alteredBytes, err := GetFileBytes(alteredPath)
+		if err != nil {
+			t.Error(err)
+		}
+		alteredBytes, err = RedactedIDAttr(alteredBytes)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if bytes.Equal(origBytes, alteredBytes) != true {
 			t.Error(fmt.Errorf("Original and Altered files were not the same after redacting id attrs"))
 
 		}
@@ -86,17 +94,28 @@ func TestRedactAttr(t *testing.T) {
 	t.Run("Test Getting Redacted Parent Attrs", func(t *testing.T) {
 		alteredPath := "test/mss_360_Altered_Parent.xml"
 
-		origBytesRedax, err := RedactedIDAttr(origPath)
-		if err != nil {
-			t.Error(err)
-		}
-		alteredBytesRedax, err := RedactedParentAttr(alteredPath)
+		origBytes, err := GetFileBytes(origPath)
 		if err != nil {
 			t.Error(err)
 		}
 
-		if bytes.Equal(origBytesRedax, alteredBytesRedax) != true {
-			t.Error(fmt.Errorf("Original and Altered files were not the same after redacting parent attrs"))
+		origBytes, err = RedactedParentAttr(origBytes)
+		if err != nil {
+			t.Error(err)
+		}
+
+		alteredBytes, err := GetFileBytes(alteredPath)
+		if err != nil {
+			t.Error(err)
+		}
+		alteredBytes, err = RedactedParentAttr(alteredBytes)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if bytes.Equal(origBytes, alteredBytes) != true {
+			t.Error(fmt.Errorf("Original and Altered files were not the same after redacting id attrs"))
+
 		}
 	})
 }

@@ -38,13 +38,13 @@ func main() {
 			}
 
 			//fmt.Printf("comparing %s with %s", dir1Path, dir2path)
-			originalBytes, err := RedactCreateDate(dir1Path)
+			originalBytes, err := GetFileBytes(dir1Path)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
 			}
 
-			newBytes, err := RedactCreateDate(dir2path)
+			newBytes, err := GetFileBytes(dir2path)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
@@ -83,16 +83,34 @@ func GetArchDescBytes(path string) ([]byte, error) {
 	return []byte{}, fmt.Errorf("wtf")
 }
 
-func RedactCreateDate(path string) ([]byte, error) {
+func GetFileBytes(path string) ([]byte, error) {
 	eadBytes, err := os.ReadFile(path)
 	if err != nil {
 		return []byte{}, err
 	}
 	eadBytes = bytes.ReplaceAll(eadBytes, []byte("\n"), []byte(""))
+	return eadBytes, nil
+}
+
+func RedactEAD(eadBytes []byte) ([]byte, error) {
+	var err error
+	eadBytes, err = RedactCreateDate(eadBytes)
+	if err != nil {
+		return nil, err
+	}
+	eadBytes, err = RedactedIDAttr(eadBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return eadBytes, nil
+}
+
+func RedactCreateDate(eadBytes []byte) ([]byte, error) {
 
 	matches := datePtn.FindAllSubmatchIndex(eadBytes, 1)
 	if len(matches) != 1 {
-		return []byte{}, fmt.Errorf("Could not find creation date in: %s", path)
+		return nil, fmt.Errorf("Could not find creation date in file")
 	}
 
 	match := matches[0]
@@ -104,16 +122,10 @@ func RedactCreateDate(path string) ([]byte, error) {
 	return eadBytes, nil
 }
 
-func RedactedIDAttr(path string) ([]byte, error) {
-	eadBytes, err := os.ReadFile(path)
-	if err != nil {
-		return []byte{}, err
-	}
-	eadBytes = bytes.ReplaceAll(eadBytes, []byte("\n"), []byte(""))
-
+func RedactedIDAttr(eadBytes []byte) ([]byte, error) {
 	ids := idPtn.FindAllSubmatchIndex(eadBytes, -1)
 	if len(ids) < 1 {
-		return []byte{}, fmt.Errorf("Could not find any ids: %s", path)
+		return nil, fmt.Errorf("Could not find any id attrs")
 	}
 
 	for _, id := range ids {
@@ -125,26 +137,16 @@ func RedactedIDAttr(path string) ([]byte, error) {
 	return eadBytes, nil
 }
 
-func RedactedParentAttr(path string) ([]byte, error) {
-	eadBytes, err := os.ReadFile(path)
-	if err != nil {
-		return []byte{}, err
-	}
-	eadBytes = bytes.ReplaceAll(eadBytes, []byte("\n"), []byte(""))
-
+func RedactedParentAttr(eadBytes []byte) ([]byte, error) {
 	ids := parentPtn.FindAllSubmatchIndex(eadBytes, -1)
 	if len(ids) < 1 {
-		return []byte{}, fmt.Errorf("Could not find any parent attrs: %s", path)
+		return nil, fmt.Errorf("Could not find any parent attrs")
 	}
 
 	for _, id := range ids {
-
 		for i := id[0] + 15; i < id[1]-1; i++ {
 			eadBytes[i] = 88
 		}
-
-		fmt.Println(string(eadBytes[id[0]:id[1]]))
-
 	}
 
 	return eadBytes, nil
