@@ -3,19 +3,32 @@ package main
 import (
 	"bytes"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 )
 
-var ad = regexp.MustCompile("<archdesc.*archdesc>")
-var datePtn = regexp.MustCompile("<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} -[0-9]{4}</date>")
-var idPtn = regexp.MustCompile("id=\"aspace_.{32}\"")
-var parentPtn = regexp.MustCompile("parent=\"aspace_.{32}\"")
-var subDirs = []string{"archives", "fales", "tamwag", "vlp"}
+var (
+	ad        = regexp.MustCompile("<archdesc.*archdesc>")
+	datePtn   = regexp.MustCompile("<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} -[0-9]{4}</date>")
+	idPtn     = regexp.MustCompile("id=\"aspace_.{32}\"")
+	parentPtn = regexp.MustCompile("parent=\"aspace_.{32}\"")
+	subDirs   = []string{"archives", "fales", "tamwag", "vlp"}
+	dump      bool
+)
+
+func init() {
+	flag.BoolVar(&dump, "dump", false, "")
+}
 
 func main() {
+	flag.Parse()
+	if dump {
+		DumpEADs()
+	}
+
 	dir1 := os.Args[1]
 	dir2 := os.Args[2]
 	fmt.Println(dir1, dir2)
@@ -44,7 +57,19 @@ func main() {
 				continue
 			}
 
+			originalBytes, err = RedactedParentAttr(originalBytes)
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+
 			newBytes, err := GetFileBytes(dir2path)
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+
+			newBytes, err = RedactEAD(newBytes)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
@@ -98,7 +123,13 @@ func RedactEAD(eadBytes []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	eadBytes, err = RedactedIDAttr(eadBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	eadBytes, err = RedactedParentAttr(eadBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -150,4 +181,25 @@ func RedactedParentAttr(eadBytes []byte) ([]byte, error) {
 	}
 
 	return eadBytes, nil
+}
+
+func DumpEADs() {
+	fmt.Println("Dumping Redacted EAD")
+
+	fileBytes, err := GetFileBytes(os.Args[2])
+	if err != nil {
+		panic(err)
+	}
+
+	fileBytes, err = RedactEAD(fileBytes)
+	if err != nil {
+		fmt.Println(err.Error())
+		panic(err)
+	}
+
+	fi, _ := os.Stat(os.Args[2])
+
+	os.WriteFile(fi.Name()+"-redacted", fileBytes, 0644)
+
+	os.Exit(0)
 }
