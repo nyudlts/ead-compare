@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -33,31 +34,43 @@ func main() {
 		DumpEADs()
 	}
 
+	logFile, _ := os.Create("ead-compare.log")
+	defer logFile.Close()
+	log.SetOutput(logFile)
+
 	dir1 := os.Args[1]
 	dir2 := os.Args[2]
 
+	fmt.Println(os.Args[0], "\ncurrent sample set location:", dir1, " previous sample set location:")
+
+	log.Println("[INFO] creating changedFiles.txt")
 	changeFile, _ := os.Create("changedFiles.txt")
 	defer changeFile.Close()
 	changeWriter := bufio.NewWriter(changeFile)
 
+	log.Println("[INFO] creating newFiles.txt")
 	newFile, _ := os.Create("newFiles.txt")
 	defer newFile.Close()
 	newWriter := bufio.NewWriter(newFile)
 
 	for _, subDir := range subDirs {
+		fmt.Println("Comparing EADS from", subDir, "respository")
 		dir1Files, err := os.ReadDir(filepath.Join(dir1, subDir))
 		if err != nil {
 			panic(err)
 		}
 
 		for _, dir1File := range dir1Files {
+
 			dir1Filename := dir1File.Name()
 			dir1Path := filepath.Join(dir1, subDir, dir1Filename)
 			dir2path := filepath.Join(dir2, subDir, dir1Filename)
+			log.Println("[INFO] comparing current sample set", dir1Path, "to previous sample set", dir2path)
 
 			err := FileExists(dir2path)
 			if err != nil {
 				newFiles++
+				log.Println("[INFO]", dir2path, "does not exist in previous sample set")
 				newWriter.WriteString(dir1Path + "\n")
 				continue
 			}
@@ -81,6 +94,7 @@ func main() {
 			if bytes.Equal(originalBytes, newBytes) != true {
 				changedFiles++
 				changeWriter.WriteString(dir1Path + "\n")
+				log.Println("[INFO]", dir1Path, "has been changed in current sampleset")
 			}
 		}
 	}
@@ -88,7 +102,9 @@ func main() {
 	newWriter.Flush()
 	changeWriter.Flush()
 
+	log.Println("[INFO]", changedFiles, "were changed from previous sample set")
 	fmt.Println(changedFiles, " were changed")
+	log.Println("[INFO]", changedFiles, "were added in current sample set")
 	fmt.Println(newFiles, " were not in previous sample set")
 
 }
@@ -102,21 +118,6 @@ func FileExists(path string) error {
 	} else {
 		return err
 	}
-}
-
-func GetArchDescBytes(path string) ([]byte, error) {
-	eadBytes, err := os.ReadFile(path)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	eadBytes = bytes.ReplaceAll(eadBytes, []byte("\n"), []byte(""))
-	matches := ad.FindAll(eadBytes, -1)
-	if len(matches) == 1 {
-		return matches[0], nil
-	}
-
-	return []byte{}, fmt.Errorf("wtf")
 }
 
 func GetFileBytes(path string) ([]byte, error) {
