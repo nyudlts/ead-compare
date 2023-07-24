@@ -43,12 +43,12 @@ func main() {
 
 	fmt.Println(os.Args[0], "\ncurrent sample set location:", dir1, " previous sample set location:")
 
-	log.Println("[INFO] creating changedFiles.txt")
+	log.Println("[INFO] creating output file: changedFiles.txt")
 	changeFile, _ := os.Create("changedFiles.txt")
 	defer changeFile.Close()
 	changeWriter := bufio.NewWriter(changeFile)
 
-	log.Println("[INFO] creating newFiles.txt")
+	log.Println("[INFO] creating outputFile: newFiles.txt")
 	newFile, _ := os.Create("newFiles.txt")
 	defer newFile.Close()
 	newWriter := bufio.NewWriter(newFile)
@@ -65,7 +65,7 @@ func main() {
 			dir1Filename := dir1File.Name()
 			dir1Path := filepath.Join(dir1, subDir, dir1Filename)
 			dir2path := filepath.Join(dir2, subDir, dir1Filename)
-			log.Println("[INFO] comparing current sample set", dir1Path, "to previous sample set", dir2path)
+			log.Println("[DEBUG] comparing", dir1Path, "to", dir2path)
 
 			err := FileExists(dir2path)
 			if err != nil {
@@ -97,6 +97,8 @@ func main() {
 				log.Println("[INFO]", dir1Path, "has been changed in current sampleset")
 			}
 		}
+		newWriter.Flush()
+		changeWriter.Flush()
 	}
 
 	newWriter.Flush()
