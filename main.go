@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"flag"
@@ -11,12 +12,14 @@ import (
 )
 
 var (
-	ad        = regexp.MustCompile("<archdesc.*archdesc>")
-	datePtn   = regexp.MustCompile("<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} -[0-9]{4}</date>")
-	idPtn     = regexp.MustCompile("id=\"aspace_.{32}\"")
-	parentPtn = regexp.MustCompile("parent=\"aspace_.{32}\"")
-	subDirs   = []string{"archives", "fales", "tamwag", "vlp"}
-	dump      bool
+	ad           = regexp.MustCompile("<archdesc.*archdesc>")
+	datePtn      = regexp.MustCompile("<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} -[0-9]{4}</date>")
+	idPtn        = regexp.MustCompile("id=\"aspace_.{32}\"")
+	parentPtn    = regexp.MustCompile("parent=\"aspace_.{32}\"")
+	subDirs      = []string{"akkasah", "archives", "cbh", "fales", "nyhs", "nyuad", "poly", "tamwag", "vlp"}
+	dump         bool
+	changedFiles = 0
+	newFiles     = 0
 )
 
 func init() {
@@ -25,13 +28,21 @@ func init() {
 
 func main() {
 	flag.Parse()
+
 	if dump {
 		DumpEADs()
 	}
 
 	dir1 := os.Args[1]
 	dir2 := os.Args[2]
-	fmt.Println(dir1, dir2)
+
+	changeFile, _ := os.Create("changedFiles.txt")
+	defer changeFile.Close()
+	changeWriter := bufio.NewWriter(changeFile)
+
+	newFile, _ := os.Create("newFiles.txt")
+	defer newFile.Close()
+	newWriter := bufio.NewWriter(newFile)
 
 	for _, subDir := range subDirs {
 		dir1Files, err := os.ReadDir(filepath.Join(dir1, subDir))
@@ -46,7 +57,8 @@ func main() {
 
 			err := FileExists(dir2path)
 			if err != nil {
-				fmt.Println("file2 does not exist: ", dir2path)
+				newFiles++
+				newWriter.WriteString(dir1Path + "\n")
 				continue
 			}
 
@@ -57,29 +69,28 @@ func main() {
 				continue
 			}
 
-			originalBytes, err = RedactedParentAttr(originalBytes)
-			if err != nil {
-				fmt.Println(err.Error())
-				continue
-			}
+			originalBytes = RedactEAD(originalBytes)
 
 			newBytes, err := GetFileBytes(dir2path)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
 			}
-
-			newBytes, err = RedactEAD(newBytes)
-			if err != nil {
-				fmt.Println(err.Error())
-				continue
-			}
+			newBytes = RedactEAD(newBytes)
 
 			if bytes.Equal(originalBytes, newBytes) != true {
-				fmt.Println(dir1Path, "has changed")
+				changedFiles++
+				changeWriter.WriteString(dir1Path + "\n")
 			}
 		}
 	}
+
+	newWriter.Flush()
+	changeWriter.Flush()
+
+	fmt.Println(changedFiles, " were changed")
+	fmt.Println(newFiles, " were not in previous sample set")
+
 }
 
 func FileExists(path string) error {
@@ -117,70 +128,53 @@ func GetFileBytes(path string) ([]byte, error) {
 	return eadBytes, nil
 }
 
-func RedactEAD(eadBytes []byte) ([]byte, error) {
-	var err error
-	eadBytes, err = RedactCreateDate(eadBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	eadBytes, err = RedactedIDAttr(eadBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	eadBytes, err = RedactedParentAttr(eadBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return eadBytes, nil
+func RedactEAD(eadBytes []byte) []byte {
+	eadBytes = RedactCreateDate(eadBytes)
+	eadBytes = RedactedIDAttr(eadBytes)
+	eadBytes = RedactedParentAttr(eadBytes)
+	return eadBytes
 }
 
-func RedactCreateDate(eadBytes []byte) ([]byte, error) {
+func RedactCreateDate(eadBytes []byte) []byte {
 
 	matches := datePtn.FindAllSubmatchIndex(eadBytes, 1)
-	if len(matches) != 1 {
-		return nil, fmt.Errorf("Could not find creation date in file")
+	if len(matches) > 0 {
+
+		match := matches[0]
+
+		for i := match[0] + 6; i < match[1]-6; i++ {
+			eadBytes[i] = 88
+		}
 	}
 
-	match := matches[0]
-
-	for i := match[0] + 6; i < match[1]-5; i++ {
-		eadBytes[i] = 88
-	}
-
-	return eadBytes, nil
+	return eadBytes
 }
 
-func RedactedIDAttr(eadBytes []byte) ([]byte, error) {
+func RedactedIDAttr(eadBytes []byte) []byte {
 	ids := idPtn.FindAllSubmatchIndex(eadBytes, -1)
-	if len(ids) < 1 {
-		return nil, fmt.Errorf("Could not find any id attrs")
-	}
-
-	for _, id := range ids {
-		for i := id[0] + 11; i < id[1]-1; i++ {
-			eadBytes[i] = 88
+	if len(ids) > 0 {
+		for _, id := range ids {
+			for i := id[0] + 11; i < id[1]-1; i++ {
+				eadBytes[i] = 88
+			}
 		}
 	}
 
-	return eadBytes, nil
+	return eadBytes
 }
 
-func RedactedParentAttr(eadBytes []byte) ([]byte, error) {
+func RedactedParentAttr(eadBytes []byte) []byte {
 	ids := parentPtn.FindAllSubmatchIndex(eadBytes, -1)
-	if len(ids) < 1 {
-		return nil, fmt.Errorf("Could not find any parent attrs")
-	}
+	if len(ids) > 0 {
 
-	for _, id := range ids {
-		for i := id[0] + 15; i < id[1]-1; i++ {
-			eadBytes[i] = 88
+		for _, id := range ids {
+			for i := id[0] + 15; i < id[1]-1; i++ {
+				eadBytes[i] = 88
+			}
 		}
 	}
 
-	return eadBytes, nil
+	return eadBytes
 }
 
 func DumpEADs() {
@@ -191,11 +185,7 @@ func DumpEADs() {
 		panic(err)
 	}
 
-	fileBytes, err = RedactEAD(fileBytes)
-	if err != nil {
-		fmt.Println(err.Error())
-		panic(err)
-	}
+	fileBytes = RedactEAD(fileBytes)
 
 	fi, _ := os.Stat(os.Args[2])
 
