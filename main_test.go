@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestDate(t *testing.T) {
+func TestRedactDate(t *testing.T) {
 	origPath := "test/mss_360_Orig.xml"
 	alteredPath := "test/mss_360_Altered_Create_Date.xml"
 
@@ -96,5 +96,26 @@ func TestRedactAttr(t *testing.T) {
 			t.Error(fmt.Errorf("Original and Altered files were not the same after redacting id attrs"))
 
 		}
+	})
+}
+
+func TestAll(t *testing.T) {
+	t.Run("Test redact all", func(t *testing.T) {
+		origPath := "test/mss_360_Orig.xml"
+		originalBytesRedacted, err := GetRedactedEADByteSlice(origPath)
+		if err != nil {
+			t.Error(err)
+		}
+
+		alteredPath := "test/mss_360_Altered_All.xml"
+		alteredBytesRedacted, err := GetRedactedEADByteSlice(alteredPath)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if bytes.Equal(originalBytesRedacted, alteredBytesRedacted) != true {
+			t.Error(fmt.Errorf("Original and Altered files were not the same after redacting all"))
+		}
+
 	})
 }
