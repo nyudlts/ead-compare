@@ -21,6 +21,8 @@ var (
 	dump         bool
 	changedFiles = 0
 	newFiles     = 0
+	removedFiles = 0
+	removeWriter *bufio.Writer
 )
 
 func init() {
@@ -52,6 +54,14 @@ func main() {
 	newFile, _ := os.Create("newFiles.txt")
 	defer newFile.Close()
 	newWriter := bufio.NewWriter(newFile)
+
+	log.Println("[INFO] creating outputFile: removedFiles.txt")
+	removeFile, _ := os.Create("removedFiles.txt")
+	defer removeFile.Close()
+	removeWriter = bufio.NewWriter(removeFile)
+
+	FindRemoved(dir1, dir2)
+	removeWriter.Flush()
 
 	for _, subDir := range subDirs {
 		fmt.Println("Comparing EADS from", subDir, "respository")
@@ -107,8 +117,34 @@ func main() {
 	log.Println("[INFO]", changedFiles, "were changed from previous sample set")
 	fmt.Println(changedFiles, " were changed")
 	log.Println("[INFO]", changedFiles, "were added in current sample set")
-	fmt.Println(newFiles, " were not in previous sample set")
+	fmt.Println(newFiles, " were not in revious sample set")
+	log.Println("[INFO]", removedFiles, "were removed in current sample set")
+	fmt.Println(removedFiles, " were removed in current sample set")
 
+}
+
+func FindRemoved(currentDir string, prevDir string) {
+	for _, subDir := range subDirs {
+		prevSubdirPath := filepath.Join(prevDir, subDir)
+		prevFiles, err := os.ReadDir(prevSubdirPath)
+		if err != nil {
+			panic(err)
+		}
+
+		currentSubDirPath := filepath.Join(currentDir, subDir)
+		for _, prevFile := range prevFiles {
+
+			if _, err := os.Stat(filepath.Join(currentSubDirPath, prevFile.Name())); err == nil {
+				//do nothing
+			} else if errors.Is(err, os.ErrNotExist) {
+				prevFilePath := filepath.Join(subDir, prevFile.Name())
+				removedFiles++
+				removeWriter.WriteString(prevFilePath)
+			} else {
+				panic(err)
+			}
+		}
+	}
 }
 
 func FileExists(path string) error {
