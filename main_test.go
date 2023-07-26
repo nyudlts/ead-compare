@@ -49,7 +49,7 @@ func TestRedactAttr(t *testing.T) {
 			t.Error(err)
 		}
 
-		origBytes = RedactedIDAttr(origBytes)
+		origBytes = RedactIDAttrs(origBytes)
 		if err != nil {
 			t.Error(err)
 		}
@@ -58,14 +58,15 @@ func TestRedactAttr(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		alteredBytes = RedactedIDAttr(alteredBytes)
+
+		alteredBytes = RedactIDAttrs(alteredBytes)
 		if err != nil {
 			t.Error(err)
 		}
 
 		if bytes.Equal(origBytes, alteredBytes) != true {
 			t.Error(fmt.Errorf("Original and Altered files were not the same after redacting id attrs"))
-
+			DumpEAD("test.xml", origBytes, alteredBytes)
 		}
 	})
 
@@ -77,7 +78,7 @@ func TestRedactAttr(t *testing.T) {
 			t.Error(err)
 		}
 
-		origBytes = RedactedParentAttr(origBytes)
+		origBytes = RedactParentAttrs(origBytes)
 		if err != nil {
 			t.Error(err)
 		}
@@ -86,7 +87,7 @@ func TestRedactAttr(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		alteredBytes = RedactedParentAttr(alteredBytes)
+		alteredBytes = RedactParentAttrs(alteredBytes)
 		if err != nil {
 			t.Error(err)
 		}

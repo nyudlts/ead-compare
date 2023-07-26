@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	ad           = regexp.MustCompile("<archdesc.*archdesc>")
 	datePtn      = regexp.MustCompile("<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} -[0-9]{4}</date>")
 	idPtn        = regexp.MustCompile("id=\"aspace_.{32}\"")
 	parentPtn    = regexp.MustCompile("parent=\"aspace_.{32}\"")
@@ -23,27 +22,24 @@ var (
 	newFiles     = 0
 	removedFiles = 0
 	removeWriter *bufio.Writer
+	currentDir   string
+	prevDir      string
 )
 
 func init() {
 	flag.BoolVar(&dump, "dump", false, "")
+	flag.StringVar(&currentDir, "current", "", "")
+	flag.StringVar(&prevDir, "prev", "", "")
 }
 
 func main() {
 	flag.Parse()
 
-	if dump {
-		DumpEADs()
-	}
-
 	logFile, _ := os.Create("ead-compare.log")
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
-	dir1 := os.Args[1]
-	dir2 := os.Args[2]
-
-	fmt.Println(os.Args[0], "\ncurrent sample set location:", dir1, " previous sample set location:")
+	fmt.Println(os.Args[0], "\ncurrent sample set location:", currentDir, " previous sample set location:", prevDir)
 
 	log.Println("[INFO] creating output file: changedFiles.txt")
 	changeFile, _ := os.Create("changedFiles.txt")
@@ -60,12 +56,13 @@ func main() {
 	defer removeFile.Close()
 	removeWriter = bufio.NewWriter(removeFile)
 
-	FindRemoved(dir1, dir2)
+	fmt.Println("Checking for ead files removed from previous sample set")
+	FindRemoved(currentDir, prevDir)
 	removeWriter.Flush()
 
 	for _, subDir := range subDirs {
 		fmt.Println("Comparing EADS from", subDir, "respository")
-		dir1Files, err := os.ReadDir(filepath.Join(dir1, subDir))
+		dir1Files, err := os.ReadDir(filepath.Join(currentDir, subDir))
 		if err != nil {
 			panic(err)
 		}
@@ -73,8 +70,8 @@ func main() {
 		for _, dir1File := range dir1Files {
 
 			dir1Filename := dir1File.Name()
-			dir1Path := filepath.Join(dir1, subDir, dir1Filename)
-			dir2path := filepath.Join(dir2, subDir, dir1Filename)
+			dir1Path := filepath.Join(currentDir, subDir, dir1Filename)
+			dir2path := filepath.Join(prevDir, subDir, dir1Filename)
 			log.Println("[DEBUG] comparing", dir1Path, "to", dir2path)
 
 			err := FileExists(dir2path)
@@ -85,39 +82,50 @@ func main() {
 				continue
 			}
 
-			//fmt.Printf("comparing %s with %s", dir1Path, dir2path)
-			originalBytes, err := GetFileBytes(dir1Path)
+			//get the redacted bytes of file in current set
+			originalBytes, err := GetRedactedEADByteSlice(dir1Path)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
 			}
 
-			originalBytes = RedactEAD(originalBytes)
-
-			newBytes, err := GetFileBytes(dir2path)
+			//get the redacted bytes of file in current set
+			newBytes, err := GetRedactedEADByteSlice(dir2path)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
 			}
-			newBytes = RedactEAD(newBytes)
 
+			//check if the byte slices are different
 			if bytes.Equal(originalBytes, newBytes) != true {
 				changedFiles++
 				changeWriter.WriteString(dir1Path + "\n")
 				log.Println("[INFO]", dir1Path, "has been changed in current sampleset")
+				//dump
+				if dump {
+					if err := DumpEAD(dir1File.Name(), originalBytes, newBytes); err != nil {
+						panic(err)
+					}
+				}
+
 			}
 		}
+
+		//flush the writers
 		newWriter.Flush()
 		changeWriter.Flush()
 	}
 
+	//flush the writers
 	newWriter.Flush()
 	changeWriter.Flush()
 
 	log.Println("[INFO]", changedFiles, "were changed from previous sample set")
 	fmt.Println(changedFiles, " were changed")
-	log.Println("[INFO]", changedFiles, "were added in current sample set")
-	fmt.Println(newFiles, " were not in revious sample set")
+
+	log.Println("[INFO]", newFiles, "were added in current sample set")
+	fmt.Println(newFiles, " EAD files were added to current sample set")
+
 	log.Println("[INFO]", removedFiles, "were removed in current sample set")
 	fmt.Println(removedFiles, " were removed in current sample set")
 
@@ -158,6 +166,17 @@ func FileExists(path string) error {
 	}
 }
 
+func GetRedactedEADByteSlice(path string) ([]byte, error) {
+	eadBytes, err := GetFileBytes(path)
+	if err != nil {
+		return nil, err
+	}
+	eadBytes = RedactCreateDate(eadBytes)
+	eadBytes = RedactIDAttrs(eadBytes)
+	eadBytes = RedactParentAttrs(eadBytes)
+	return eadBytes, nil
+}
+
 func GetFileBytes(path string) ([]byte, error) {
 	eadBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -165,13 +184,6 @@ func GetFileBytes(path string) ([]byte, error) {
 	}
 	eadBytes = bytes.ReplaceAll(eadBytes, []byte("\n"), []byte(""))
 	return eadBytes, nil
-}
-
-func RedactEAD(eadBytes []byte) []byte {
-	eadBytes = RedactCreateDate(eadBytes)
-	eadBytes = RedactedIDAttr(eadBytes)
-	eadBytes = RedactedParentAttr(eadBytes)
-	return eadBytes
 }
 
 func RedactCreateDate(eadBytes []byte) []byte {
@@ -189,7 +201,7 @@ func RedactCreateDate(eadBytes []byte) []byte {
 	return eadBytes
 }
 
-func RedactedIDAttr(eadBytes []byte) []byte {
+func RedactIDAttrs(eadBytes []byte) []byte {
 	ids := idPtn.FindAllSubmatchIndex(eadBytes, -1)
 	if len(ids) > 0 {
 		for _, id := range ids {
@@ -202,7 +214,7 @@ func RedactedIDAttr(eadBytes []byte) []byte {
 	return eadBytes
 }
 
-func RedactedParentAttr(eadBytes []byte) []byte {
+func RedactParentAttrs(eadBytes []byte) []byte {
 	ids := parentPtn.FindAllSubmatchIndex(eadBytes, -1)
 	if len(ids) > 0 {
 
@@ -216,19 +228,19 @@ func RedactedParentAttr(eadBytes []byte) []byte {
 	return eadBytes
 }
 
-func DumpEADs() {
-	fmt.Println("Dumping Redacted EAD")
+func DumpEAD(filename string, origEad []byte, newEad []byte) error {
+	err := os.Mkdir("dump", 0777)
+	currentDir := filepath.Join("dump", "current")
+	err = os.Mkdir(currentDir, 0777)
+	prevDir := filepath.Join("dump", "previous")
+	err = os.Mkdir(prevDir, 0777)
 
-	fileBytes, err := GetFileBytes(os.Args[2])
+	err = os.WriteFile(filepath.Join(currentDir, filename), origEad, 0777)
+	err = os.WriteFile(filepath.Join(prevDir, filename), newEad, 0777)
+
 	if err != nil {
-		panic(err)
+		return err
+	} else {
+		return nil
 	}
-
-	fileBytes = RedactEAD(fileBytes)
-
-	fi, _ := os.Stat(os.Args[2])
-
-	os.WriteFile(fi.Name()+"-redacted", fileBytes, 0644)
-
-	os.Exit(0)
 }
